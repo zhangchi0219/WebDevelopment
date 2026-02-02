@@ -1,0 +1,53 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>3D 照片画廊</title>
+  <link rel="stylesheet" href="/css/style.css">
+</head>
+<body>
+  <!-- 上传面板 -->
+  <div id="upload-panel" class="panel">
+    <h2>照片上传</h2>
+    <div class="upload-area" id="upload-area">
+      <input type="file" id="file-input" accept="image/*" multiple hidden>
+      <div class="upload-icon">+</div>
+      <p>点击或拖拽照片到这里上传</p>
+      <p class="hint">支持 JPG, PNG, GIF, WebP (最大 10MB)</p>
+    </div>
+    <div id="upload-progress" class="upload-progress hidden">
+      <div class="progress-bar">
+        <div class="progress-fill" id="progress-fill"></div>
+      </div>
+      <span id="progress-text">上传中...</span>
+    </div>
+    <div class="stats">
+      <span>已上传: <strong id="photo-count">0</strong> 张照片</span>
+    </div>
+    <button id="toggle-panel" class="toggle-btn">收起面板</button>
+  </div>
+
+  <!-- Three.js 画布容器 -->
+  <div id="canvas-container"></div>
+
+  <!-- 提示信息 -->
+  <div id="toast" class="toast hidden"></div>
+
+  <!-- 加载指示器 -->
+  <div id="loading" class="loading">
+    <div class="spinner"></div>
+    <p>加载中...</p>
+  </div>
+
+  <!-- 操作提示 -->
+  <div id="controls-hint" class="controls-hint">
+    <p>鼠标拖拽旋转 | 滚轮缩放 | 右键平移</p>
+  </div>
+
+  <!-- 引入 Three.js -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+  <script src="/js/gallery.js"></script>
+</body>
+</html>
