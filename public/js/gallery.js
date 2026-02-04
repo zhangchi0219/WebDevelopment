@@ -14,6 +14,9 @@ class PhotoGallery {
     this.photos = [];
     this.radius = 15; // 圆形半径
     this.photoSize = 2; // 照片大小
+    this.raycaster = new THREE.Raycaster();
+    this.mouse = new THREE.Vector2();
+    this.meshToPhoto = new Map(); // mesh 到 photo 的映射
 
     this.init();
   }
@@ -154,6 +157,45 @@ class PhotoGallery {
     // 清除照片按钮
     const clearBtn = document.getElementById('clear-photos');
     clearBtn.addEventListener('click', () => this.clearAllPhotos());
+
+    // 照片点击事件
+    this.renderer.domElement.addEventListener('click', (e) => this.onPhotoClick(e));
+
+    // 关闭大图预览
+    const lightbox = document.getElementById('lightbox');
+    lightbox.addEventListener('click', () => this.closeLightbox());
+  }
+
+  onPhotoClick(event) {
+    // 计算鼠标位置
+    this.mouse.x = (event.clientX / window.innerWidth) * 2 - 1;
+    this.mouse.y = -(event.clientY / window.innerHeight) * 2 + 1;
+
+    // 射线检测
+    this.raycaster.setFromCamera(this.mouse, this.camera);
+    const intersects = this.raycaster.intersectObjects(this.photoMeshes);
+
+    if (intersects.length > 0) {
+      const mesh = intersects[0].object;
+      const photo = this.meshToPhoto.get(mesh);
+      if (photo) {
+        this.openLightbox(photo);
+      }
+    }
+  }
+
+  openLightbox(photo) {
+    const lightbox = document.getElementById('lightbox');
+    const lightboxImg = document.getElementById('lightbox-img');
+    lightboxImg.src = photo.url;
+    lightbox.classList.remove('hidden');
+    lightbox.classList.add('visible');
+  }
+
+  closeLightbox() {
+    const lightbox = document.getElementById('lightbox');
+    lightbox.classList.remove('visible');
+    setTimeout(() => lightbox.classList.add('hidden'), 300);
   }
 
   async clearAllPhotos() {
@@ -162,7 +204,7 @@ class PhotoGallery {
     }
 
     try {
-      const response = await fetch('/api/photos', {
+      const response = await fetch('/api/photos/all', {
         method: 'DELETE'
       });
       const data = await response.json();
@@ -209,6 +251,7 @@ class PhotoGallery {
     // 清除现有照片
     this.photoMeshes.forEach(mesh => this.scene.remove(mesh));
     this.photoMeshes = [];
+    this.meshToPhoto.clear();
 
     if (this.photos.length === 0) {
       this.createPlaceholder();
@@ -267,6 +310,7 @@ class PhotoGallery {
 
     this.scene.add(mesh);
     this.photoMeshes.push(mesh);
+    this.meshToPhoto.set(mesh, photo);
 
     // 异步加载纹理
     this.textureLoader.load(

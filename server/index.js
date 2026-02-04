@@ -187,7 +187,7 @@ app.delete('/api/photos/:id', (req, res) => {
 });
 
 // 清除所有照片 API
-app.delete('/api/photos', (req, res) => {
+app.delete('/api/photos/all', (req, res) => {
   try {
     const fs = require('fs');
 
