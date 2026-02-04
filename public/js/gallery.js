@@ -187,28 +187,30 @@ class PhotoGallery {
     }
 
     const count = this.photos.length;
-
-    // 动态调整圆形参数
-    // 根据照片数量计算需要多少圈
-    const photosPerRing = Math.ceil(Math.sqrt(count) * 2);
-    const rings = Math.ceil(count / photosPerRing);
-
+    const spacing = this.photoSize + 0.3;
     let photoIndex = 0;
 
-    for (let ring = 0; ring < rings && photoIndex < count; ring++) {
-      const ringRadius = this.radius + ring * (this.photoSize + 0.5);
-      const photosInThisRing = Math.min(
-        Math.floor(2 * Math.PI * ringRadius / (this.photoSize + 0.3)),
-        count - photoIndex
-      );
+    // 从圆心开始，向外扩展填满圆盘
+    // 第一张放在圆心
+    if (photoIndex < count) {
+      this.createPhotoMesh(this.photos[photoIndex], 0, 0, 0);
+      photoIndex++;
+    }
+
+    // 从内到外一圈圈填充
+    let ring = 1;
+    while (photoIndex < count) {
+      const ringRadius = ring * spacing;
+      // 根据圆周长计算这一圈能放多少张
+      const circumference = 2 * Math.PI * ringRadius;
+      const photosInThisRing = Math.max(6, Math.floor(circumference / spacing));
 
       for (let i = 0; i < photosInThisRing && photoIndex < count; i++) {
         const angle = (i / photosInThisRing) * Math.PI * 2;
-        const photo = this.photos[photoIndex];
-
-        this.createPhotoMesh(photo, ringRadius, angle, ring);
+        this.createPhotoMesh(this.photos[photoIndex], ringRadius, angle, 0);
         photoIndex++;
       }
+      ring++;
     }
   }
 
@@ -226,16 +228,13 @@ class PhotoGallery {
 
     const mesh = new THREE.Mesh(geometry, material);
 
-    // 计算位置 (XY 平面上的圆形)
+    // 计算位置 (XY 平面上的圆盘)
     const x = Math.cos(angle) * radius;
     const y = Math.sin(angle) * radius;
-    const z = ringIndex * 0.1; // 稍微偏移z轴，避免重叠
+    const z = 0;
 
     mesh.position.set(x, y, z);
-
-    // 让照片面向圆心
-    mesh.lookAt(0, 0, z);
-    mesh.rotateY(Math.PI); // 翻转使正面朝外
+    // 照片平铺在 XY 平面，面向 Z 轴（相机方向）
 
     this.scene.add(mesh);
     this.photoMeshes.push(mesh);
