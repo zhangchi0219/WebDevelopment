@@ -1,28 +1,56 @@
 /**
  * 3D 照片画廊
- * 使用 Three.js 将照片排列成圆形展示
+ * 使用 Three.js 将照片排列成完美圆形展示
  */
 
-// 完美圆形照片数量表 (网格大小 -> 照片数)
-const PERFECT_CIRCLE_COUNTS = [
-  { grid: 3, count: 5 },
-  { grid: 5, count: 13 },
-  { grid: 7, count: 29 },
-  { grid: 9, count: 49 },
-  { grid: 11, count: 81 },
-  { grid: 13, count: 113 },
-  { grid: 15, count: 149 },
-  { grid: 17, count: 197 },  // 默认推荐
-  { grid: 19, count: 253 },
-  { grid: 21, count: 317 },
-  { grid: 23, count: 377 },
-  { grid: 25, count: 441 },
-  { grid: 27, count: 529 },
-  { grid: 29, count: 613 },
-  { grid: 31, count: 709 }
-];
+// 圆形裁剪 Shader
+const CircleClipShader = {
+  vertexShader: `
+    varying vec2 vUv;
+    varying vec3 vWorldPosition;
 
-const DEFAULT_PHOTO_COUNT = 197; // 17x17 网格，完美圆形
+    void main() {
+      vUv = uv;
+      vec4 worldPosition = modelMatrix * vec4(position, 1.0);
+      vWorldPosition = worldPosition.xyz;
+      gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+    }
+  `,
+  fragmentShader: `
+    uniform sampler2D map;
+    uniform vec3 diffuse;
+    uniform float opacity;
+    uniform float clipRadius;
+    uniform bool hasTexture;
+
+    varying vec2 vUv;
+    varying vec3 vWorldPosition;
+
+    void main() {
+      // 计算到圆心的距离
+      float dist = length(vWorldPosition.xy);
+
+      // 如果超出圆形范围，丢弃像素
+      if (dist > clipRadius) {
+        discard;
+      }
+
+      vec4 color;
+      if (hasTexture) {
+        color = texture2D(map, vUv);
+        color.rgb *= diffuse;
+      } else {
+        color = vec4(diffuse, 1.0);
+      }
+      color.a *= opacity;
+
+      gl_FragColor = color;
+    }
+  `
+};
+
+// 默认网格大小和照片数
+const DEFAULT_GRID_SIZE = 15;
 
 class PhotoGallery {
   constructor() {
@@ -31,46 +59,16 @@ class PhotoGallery {
     this.renderer = null;
     this.controls = null;
     this.photoMeshes = [];
-    this.circleMask = null;
     this.textureLoader = new THREE.TextureLoader();
     this.photos = [];
     this.photoSize = 2; // 照片大小
-    this.diskRadius = 0; // 圆盘实际半径，动态计算
+    this.gridSize = DEFAULT_GRID_SIZE; // 网格大小
+    this.clipRadius = 0; // 圆形裁剪半径
     this.raycaster = new THREE.Raycaster();
     this.mouse = new THREE.Vector2();
-    this.meshToPhoto = new Map(); // mesh 到 photo 的映射
-    this.maxPhotos = DEFAULT_PHOTO_COUNT; // 默认最大照片数
+    this.meshToPhoto = new Map();
 
     this.init();
-  }
-
-  // 根据照片数量找到最合适的完美圆形网格
-  findPerfectCircleGrid(photoCount) {
-    for (let i = PERFECT_CIRCLE_COUNTS.length - 1; i >= 0; i--) {
-      if (PERFECT_CIRCLE_COUNTS[i].count <= photoCount) {
-        return PERFECT_CIRCLE_COUNTS[i];
-      }
-    }
-    return PERFECT_CIRCLE_COUNTS[0];
-  }
-
-  // 计算指定网格大小的完美圆形位置
-  getCirclePositions(gridSize) {
-    const positions = [];
-    const halfGrid = (gridSize - 1) / 2;
-    const radius = gridSize / 2;
-
-    for (let row = 0; row < gridSize; row++) {
-      for (let col = 0; col < gridSize; col++) {
-        const x = col - halfGrid;
-        const y = halfGrid - row;
-        const dist = Math.sqrt(x * x + y * y);
-        if (dist <= radius - 0.5) {
-          positions.push({ x: x * this.photoSize, y: y * this.photoSize });
-        }
-      }
-    }
-    return positions;
   }
 
   init() {
@@ -113,7 +111,7 @@ class PhotoGallery {
   setupCamera() {
     const aspect = window.innerWidth / window.innerHeight;
     this.camera = new THREE.PerspectiveCamera(60, aspect, 0.1, 1000);
-    this.camera.position.set(0, 0, 30);
+    this.camera.position.set(0, 0, 35);
   }
 
   setupRenderer() {
@@ -138,25 +136,13 @@ class PhotoGallery {
   }
 
   setupLights() {
-    // 环境光
-    const ambientLight = new THREE.AmbientLight(0xffffff, 0.6);
+    const ambientLight = new THREE.AmbientLight(0xffffff, 1.0);
     this.scene.add(ambientLight);
-
-    // 点光源
-    const pointLight1 = new THREE.PointLight(0x4a9eff, 0.8, 100);
-    pointLight1.position.set(20, 20, 20);
-    this.scene.add(pointLight1);
-
-    const pointLight2 = new THREE.PointLight(0x6c5ce7, 0.8, 100);
-    pointLight2.position.set(-20, -20, 20);
-    this.scene.add(pointLight2);
   }
 
   setupEventListeners() {
-    // 窗口大小调整
     window.addEventListener('resize', () => this.onWindowResize());
 
-    // 上传区域事件
     const uploadArea = document.getElementById('upload-area');
     const fileInput = document.getElementById('file-input');
 
@@ -186,7 +172,6 @@ class PhotoGallery {
       }
     });
 
-    // 面板切换
     const toggleBtn = document.getElementById('toggle-panel');
     const panel = document.getElementById('upload-panel');
 
@@ -195,7 +180,6 @@ class PhotoGallery {
       toggleBtn.textContent = panel.classList.contains('collapsed') ? '展开面板' : '收起面板';
     });
 
-    // 鼠标交互时暂停自动旋转
     this.renderer.domElement.addEventListener('mousedown', () => {
       this.controls.autoRotate = false;
     });
@@ -206,24 +190,19 @@ class PhotoGallery {
       }, 3000);
     });
 
-    // 清除照片按钮
     const clearBtn = document.getElementById('clear-photos');
     clearBtn.addEventListener('click', () => this.clearAllPhotos());
 
-    // 照片点击事件
     this.renderer.domElement.addEventListener('click', (e) => this.onPhotoClick(e));
 
-    // 关闭大图预览
     const lightbox = document.getElementById('lightbox');
     lightbox.addEventListener('click', () => this.closeLightbox());
   }
 
   onPhotoClick(event) {
-    // 计算鼠标位置
     this.mouse.x = (event.clientX / window.innerWidth) * 2 - 1;
     this.mouse.y = -(event.clientY / window.innerHeight) * 2 + 1;
 
-    // 射线检测
     this.raycaster.setFromCamera(this.mouse, this.camera);
     const intersects = this.raycaster.intersectObjects(this.photoMeshes);
 
@@ -299,62 +278,77 @@ class PhotoGallery {
     }
   }
 
+  // 计算需要的网格大小来容纳照片数量
+  calculateGridSize(photoCount) {
+    // 圆形面积 = π * r², 网格面积 = gridSize²
+    // 圆形内的格子数约为 π * (gridSize/2)² = π * gridSize² / 4
+    // 所以 gridSize = sqrt(4 * photoCount / π)
+    const minGrid = Math.ceil(Math.sqrt(4 * photoCount / Math.PI));
+    // 确保是奇数，这样圆心在正中间
+    return minGrid % 2 === 0 ? minGrid + 1 : minGrid;
+  }
+
   createPhotoCircle() {
-    // 清除现有照片和遮罩
-    this.photoMeshes.forEach(mesh => this.scene.remove(mesh));
+    // 清除现有照片
+    this.photoMeshes.forEach(mesh => {
+      this.scene.remove(mesh);
+      if (mesh.material.uniforms && mesh.material.uniforms.map.value) {
+        mesh.material.uniforms.map.value.dispose();
+      }
+      mesh.material.dispose();
+      mesh.geometry.dispose();
+    });
     this.photoMeshes = [];
     this.meshToPhoto.clear();
-    if (this.circleMask) {
-      this.scene.remove(this.circleMask);
-      this.circleMask = null;
-    }
 
-    if (this.photos.length === 0) {
+    const photoCount = this.photos.length;
+
+    if (photoCount === 0) {
       this.createPlaceholder();
       return;
     }
 
-    // 找到能容纳当前照片数量的最小完美圆形
-    const perfectCircle = this.findPerfectCircleGrid(this.photos.length);
-    const positions = this.getCirclePositions(perfectCircle.grid);
+    // 计算合适的网格大小
+    this.gridSize = this.calculateGridSize(photoCount);
 
-    // 只显示能填满完美圆形的照片数量
-    const displayCount = Math.min(this.photos.length, perfectCircle.count);
+    // 圆形半径（略小于网格一半，确保完美圆形）
+    this.clipRadius = (this.gridSize * this.photoSize) / 2 - 0.01;
 
-    for (let i = 0; i < displayCount; i++) {
-      this.createPhotoMesh(this.photos[i], positions[i].x, positions[i].y);
+    const halfGrid = (this.gridSize - 1) / 2;
+    let photoIndex = 0;
+
+    // 按网格排列所有照片
+    for (let row = 0; row < this.gridSize && photoIndex < photoCount; row++) {
+      for (let col = 0; col < this.gridSize && photoIndex < photoCount; col++) {
+        const x = (col - halfGrid) * this.photoSize;
+        const y = (halfGrid - row) * this.photoSize;
+
+        // 只在圆形范围内创建照片（包括边缘会被裁剪的）
+        const dist = Math.sqrt(x * x + y * y);
+        if (dist < this.clipRadius + this.photoSize) {
+          this.createPhotoMesh(this.photos[photoIndex], x, y);
+          photoIndex++;
+        }
+      }
     }
-
-    // 添加圆形遮罩
-    const radius = (perfectCircle.grid * this.photoSize) / 2;
-    this.diskRadius = radius;
-    this.addCircleMask(this.diskRadius);
-  }
-
-  addCircleMask(radius) {
-    // 创建一个大的环形遮罩，内圈是圆盘半径，外圈很大，颜色与背景相同
-    const innerRadius = radius;
-    const outerRadius = radius + 100;
-    const geometry = new THREE.RingGeometry(innerRadius, outerRadius, 128);
-    const material = new THREE.MeshBasicMaterial({
-      color: 0x0a0a0a,
-      side: THREE.DoubleSide
-    });
-    this.circleMask = new THREE.Mesh(geometry, material);
-    this.circleMask.position.z = 0.01;
-    this.scene.add(this.circleMask);
   }
 
   createPhotoMesh(photo, x, y) {
-    // 创建照片平面 - 1:1 正方形缩略图
     const geometry = new THREE.PlaneGeometry(this.photoSize, this.photoSize);
 
-    // 创建加载中的材质
-    const material = new THREE.MeshStandardMaterial({
-      color: 0x333333,
-      side: THREE.DoubleSide,
+    // 使用自定义 Shader 材质实现圆形裁剪
+    const material = new THREE.ShaderMaterial({
+      uniforms: {
+        map: { value: null },
+        diffuse: { value: new THREE.Color(0x333333) },
+        opacity: { value: 0.9 },
+        clipRadius: { value: this.clipRadius },
+        hasTexture: { value: false }
+      },
+      vertexShader: CircleClipShader.vertexShader,
+      fragmentShader: CircleClipShader.fragmentShader,
       transparent: true,
-      opacity: 0.9
+      side: THREE.DoubleSide
     });
 
     const mesh = new THREE.Mesh(geometry, material);
@@ -376,22 +370,19 @@ class PhotoGallery {
         const imgAspect = img.width / img.height;
 
         if (imgAspect > 1) {
-          // 横图：裁剪左右
           texture.repeat.set(1 / imgAspect, 1);
           texture.offset.set((1 - 1 / imgAspect) / 2, 0);
         } else {
-          // 竖图：裁剪上下
           texture.repeat.set(1, imgAspect);
           texture.offset.set(0, (1 - imgAspect) / 2);
         }
 
-        mesh.material.map = texture;
-        mesh.material.color.set(0xffffff);
-        mesh.material.needsUpdate = true;
+        material.uniforms.map.value = texture;
+        material.uniforms.diffuse.value.set(0xffffff);
+        material.uniforms.hasTexture.value = true;
+        material.uniforms.opacity.value = 0;
 
-        // 淡入效果
-        mesh.material.opacity = 0;
-        this.fadeIn(mesh);
+        this.fadeIn(material);
       },
       undefined,
       (error) => {
@@ -400,12 +391,12 @@ class PhotoGallery {
     );
   }
 
-  fadeIn(mesh, duration = 500) {
+  fadeIn(material, duration = 500) {
     const startTime = Date.now();
     const animate = () => {
       const elapsed = Date.now() - startTime;
       const progress = Math.min(elapsed / duration, 1);
-      mesh.material.opacity = progress * 0.95;
+      material.uniforms.opacity.value = progress;
 
       if (progress < 1) {
         requestAnimationFrame(animate);
@@ -415,33 +406,42 @@ class PhotoGallery {
   }
 
   createPlaceholder() {
-    // 清除遮罩
-    if (this.circleMask) {
-      this.scene.remove(this.circleMask);
-      this.circleMask = null;
+    // 默认使用 15x15 网格
+    this.gridSize = DEFAULT_GRID_SIZE;
+    this.clipRadius = (this.gridSize * this.photoSize) / 2 - 0.01;
+
+    const halfGrid = (this.gridSize - 1) / 2;
+
+    for (let row = 0; row < this.gridSize; row++) {
+      for (let col = 0; col < this.gridSize; col++) {
+        const x = (col - halfGrid) * this.photoSize;
+        const y = (halfGrid - row) * this.photoSize;
+
+        const dist = Math.sqrt(x * x + y * y);
+        if (dist < this.clipRadius + this.photoSize) {
+          this.createPlaceholderMesh(x, y);
+        }
+      }
     }
-
-    // 使用默认完美圆形 (17x17 = 197张)
-    const positions = this.getCirclePositions(17);
-
-    for (const pos of positions) {
-      this.createPlaceholderMesh(pos.x, pos.y);
-    }
-
-    // 添加圆形遮罩
-    const radius = (17 * this.photoSize) / 2;
-    this.diskRadius = radius;
-    this.addCircleMask(this.diskRadius);
   }
 
   createPlaceholderMesh(x, y) {
     const geometry = new THREE.PlaneGeometry(this.photoSize, this.photoSize);
-    const material = new THREE.MeshStandardMaterial({
-      color: 0x333333,
-      side: THREE.DoubleSide,
+
+    const material = new THREE.ShaderMaterial({
+      uniforms: {
+        map: { value: null },
+        diffuse: { value: new THREE.Color(0x333333) },
+        opacity: { value: 0.8 },
+        clipRadius: { value: this.clipRadius },
+        hasTexture: { value: false }
+      },
+      vertexShader: CircleClipShader.vertexShader,
+      fragmentShader: CircleClipShader.fragmentShader,
       transparent: true,
-      opacity: 0.8
+      side: THREE.DoubleSide
     });
+
     const mesh = new THREE.Mesh(geometry, material);
     mesh.position.set(x, y, 0);
     this.scene.add(mesh);
@@ -485,7 +485,6 @@ class PhotoGallery {
           progressFill.style.width = `${progress}%`;
           progressText.textContent = `上传中... ${uploaded}/${total}`;
 
-          // 添加新照片到数组开头
           this.photos.unshift(data.photo);
         } else {
           console.error('上传失败:', data.error);
@@ -502,7 +501,6 @@ class PhotoGallery {
     this.createPhotoCircle();
     this.showToast(`成功上传 ${uploaded} 张照片`, 'success');
 
-    // 清除文件输入
     document.getElementById('file-input').value = '';
   }
 
@@ -515,10 +513,8 @@ class PhotoGallery {
     toast.textContent = message;
     toast.className = `toast ${type}`;
 
-    // 显示
     setTimeout(() => toast.classList.add('visible'), 10);
 
-    // 隐藏
     setTimeout(() => {
       toast.classList.remove('visible');
       setTimeout(() => toast.classList.add('hidden'), 300);
@@ -532,11 +528,7 @@ class PhotoGallery {
 
   animate() {
     requestAnimationFrame(() => this.animate());
-
-    // 更新控制器
     this.controls.update();
-
-    // 渲染场景
     this.renderer.render(this.scene, this.camera);
   }
 }
