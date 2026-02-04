@@ -264,55 +264,51 @@ class PhotoGallery {
     }
 
     const count = this.photos.length;
-    const size = this.photoSize; // 无间隔
+    const size = this.photoSize;
+
+    // 计算网格大小，使其能容纳所有照片并形成圆形
+    const gridSize = Math.ceil(Math.sqrt(count * 4 / Math.PI)) + 2; // 略大一些确保填满圆
+    const halfGrid = (gridSize - 1) / 2;
+    const radius = (gridSize * size) / 2;
+
     let photoIndex = 0;
-    let maxRadius = 0;
 
-    // 从圆心开始，向外扩展填满圆盘
-    // 第一张放在圆心
-    if (photoIndex < count) {
-      this.createPhotoMesh(this.photos[photoIndex], 0, 0);
-      photoIndex++;
-    }
+    // 按行列排列，只放置在圆形范围内的位置
+    for (let row = 0; row < gridSize && photoIndex < count; row++) {
+      for (let col = 0; col < gridSize && photoIndex < count; col++) {
+        const x = (col - halfGrid) * size;
+        const y = (halfGrid - row) * size;
 
-    // 从内到外一圈圈填充，无间隔
-    let ring = 1;
-    while (photoIndex < count) {
-      const ringRadius = ring * size;
-      // 根据圆周长计算这一圈能放多少张
-      const circumference = 2 * Math.PI * ringRadius;
-      const photosInThisRing = Math.max(6, Math.floor(circumference / size));
-
-      for (let i = 0; i < photosInThisRing && photoIndex < count; i++) {
-        const angle = (i / photosInThisRing) * Math.PI * 2;
-        this.createPhotoMesh(this.photos[photoIndex], ringRadius, angle);
-        photoIndex++;
+        // 检查是否在圆形范围内
+        const distFromCenter = Math.sqrt(x * x + y * y);
+        if (distFromCenter <= radius - size / 2) {
+          this.createPhotoMesh(this.photos[photoIndex], x, y);
+          photoIndex++;
+        }
       }
-      maxRadius = ringRadius;
-      ring++;
     }
 
-    // 记录圆盘半径并添加圆形遮罩
-    this.diskRadius = maxRadius + size / 2;
+    // 添加圆形遮罩
+    this.diskRadius = radius;
     this.addCircleMask(this.diskRadius);
   }
 
   addCircleMask(radius) {
     // 创建一个大的环形遮罩，内圈是圆盘半径，外圈很大，颜色与背景相同
     const innerRadius = radius;
-    const outerRadius = radius + 100; // 足够大以覆盖视野外的区域
+    const outerRadius = radius + 100;
     const geometry = new THREE.RingGeometry(innerRadius, outerRadius, 128);
     const material = new THREE.MeshBasicMaterial({
-      color: 0x0a0a0a, // 与背景色相同
+      color: 0x0a0a0a,
       side: THREE.DoubleSide
     });
     this.circleMask = new THREE.Mesh(geometry, material);
-    this.circleMask.position.z = 0.01; // 略微在照片前面
+    this.circleMask.position.z = 0.01;
     this.scene.add(this.circleMask);
   }
 
-  createPhotoMesh(photo, radius, angle) {
-    // 创建照片平面 - 固定尺寸，无间隔
+  createPhotoMesh(photo, x, y) {
+    // 创建照片平面 - 1:1 正方形缩略图
     const geometry = new THREE.PlaneGeometry(this.photoSize, this.photoSize);
 
     // 创建加载中的材质
@@ -324,11 +320,6 @@ class PhotoGallery {
     });
 
     const mesh = new THREE.Mesh(geometry, material);
-
-    // 计算位置 (XY 平面上的圆盘)
-    const x = Math.cos(angle) * radius;
-    const y = Math.sin(angle) * radius;
-
     mesh.position.set(x, y, 0);
 
     this.scene.add(mesh);
@@ -342,12 +333,25 @@ class PhotoGallery {
         texture.minFilter = THREE.LinearFilter;
         texture.magFilter = THREE.LinearFilter;
 
-        // 更新材质 - 保持固定尺寸，图片会被裁剪填充
+        // 1:1 裁剪居中显示
+        const img = texture.image;
+        const imgAspect = img.width / img.height;
+
+        if (imgAspect > 1) {
+          // 横图：裁剪左右
+          texture.repeat.set(1 / imgAspect, 1);
+          texture.offset.set((1 - 1 / imgAspect) / 2, 0);
+        } else {
+          // 竖图：裁剪上下
+          texture.repeat.set(1, imgAspect);
+          texture.offset.set(0, (1 - imgAspect) / 2);
+        }
+
         mesh.material.map = texture;
         mesh.material.color.set(0xffffff);
         mesh.material.needsUpdate = true;
 
-        // 添加淡入效果
+        // 淡入效果
         mesh.material.opacity = 0;
         this.fadeIn(mesh);
       },
@@ -379,38 +383,33 @@ class PhotoGallery {
       this.circleMask = null;
     }
 
-    // 创建200个无间隔的空白placeholder排列成圆盘
+    // 创建200个无间隔的空白placeholder，按网格排列成圆形
     const count = 200;
     const size = this.photoSize;
+
+    // 计算网格大小
+    const gridSize = Math.ceil(Math.sqrt(count * 4 / Math.PI)) + 2;
+    const halfGrid = (gridSize - 1) / 2;
+    const radius = (gridSize * size) / 2;
+
     let placeholderIndex = 0;
-    let maxRadius = 0;
 
-    // 第一个放在圆心
-    if (placeholderIndex < count) {
-      this.createPlaceholderMesh(0, 0);
-      placeholderIndex++;
-    }
+    // 按行列排列，只放置在圆形范围内
+    for (let row = 0; row < gridSize && placeholderIndex < count; row++) {
+      for (let col = 0; col < gridSize && placeholderIndex < count; col++) {
+        const x = (col - halfGrid) * size;
+        const y = (halfGrid - row) * size;
 
-    // 从内到外一圈圈填充，无间隔
-    let ring = 1;
-    while (placeholderIndex < count) {
-      const ringRadius = ring * size;
-      const circumference = 2 * Math.PI * ringRadius;
-      const placeholdersInThisRing = Math.max(6, Math.floor(circumference / size));
-
-      for (let i = 0; i < placeholdersInThisRing && placeholderIndex < count; i++) {
-        const angle = (i / placeholdersInThisRing) * Math.PI * 2;
-        const x = Math.cos(angle) * ringRadius;
-        const y = Math.sin(angle) * ringRadius;
-        this.createPlaceholderMesh(x, y);
-        placeholderIndex++;
+        const distFromCenter = Math.sqrt(x * x + y * y);
+        if (distFromCenter <= radius - size / 2) {
+          this.createPlaceholderMesh(x, y);
+          placeholderIndex++;
+        }
       }
-      maxRadius = ringRadius;
-      ring++;
     }
 
     // 添加圆形遮罩
-    this.diskRadius = maxRadius + size / 2;
+    this.diskRadius = radius;
     this.addCircleMask(this.diskRadius);
   }
 
