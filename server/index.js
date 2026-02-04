@@ -158,7 +158,33 @@ app.get('/api/photos', (req, res) => {
   }
 });
 
-// 删除照片 API
+// 清除所有照片 API (必须在 :id 路由之前)
+app.delete('/api/photos/all', (req, res) => {
+  try {
+    const fs = require('fs');
+
+    // 获取所有照片
+    const photos = db.prepare('SELECT filename FROM photos').all();
+
+    // 删除所有文件
+    for (const photo of photos) {
+      const filePath = path.join(__dirname, '../public/uploads', photo.filename);
+      if (fs.existsSync(filePath)) {
+        fs.unlinkSync(filePath);
+      }
+    }
+
+    // 清空数据库表
+    db.prepare('DELETE FROM photos').run();
+
+    res.json({ success: true, message: '所有照片已清除' });
+  } catch (error) {
+    console.error('清除照片错误:', error);
+    res.status(500).json({ error: '清除失败' });
+  }
+});
+
+// 删除单张照片 API
 app.delete('/api/photos/:id', (req, res) => {
   try {
     const { id } = req.params;
@@ -183,32 +209,6 @@ app.delete('/api/photos/:id', (req, res) => {
   } catch (error) {
     console.error('删除照片错误:', error);
     res.status(500).json({ error: '删除失败' });
-  }
-});
-
-// 清除所有照片 API
-app.delete('/api/photos/all', (req, res) => {
-  try {
-    const fs = require('fs');
-
-    // 获取所有照片
-    const photos = db.prepare('SELECT filename FROM photos').all();
-
-    // 删除所有文件
-    for (const photo of photos) {
-      const filePath = path.join(__dirname, '../public/uploads', photo.filename);
-      if (fs.existsSync(filePath)) {
-        fs.unlinkSync(filePath);
-      }
-    }
-
-    // 清空数据库表
-    db.prepare('DELETE FROM photos').run();
-
-    res.json({ success: true, message: '所有照片已清除' });
-  } catch (error) {
-    console.error('清除照片错误:', error);
-    res.status(500).json({ error: '清除失败' });
   }
 });
 
