@@ -10,10 +10,11 @@ class PhotoGallery {
     this.renderer = null;
     this.controls = null;
     this.photoMeshes = [];
+    this.circleMask = null;
     this.textureLoader = new THREE.TextureLoader();
     this.photos = [];
-    this.radius = 15; // 圆形半径
     this.photoSize = 2; // 照片大小
+    this.diskRadius = 0; // 圆盘实际半径，动态计算
     this.raycaster = new THREE.Raycaster();
     this.mouse = new THREE.Vector2();
     this.meshToPhoto = new Map(); // mesh 到 photo 的映射
@@ -248,10 +249,14 @@ class PhotoGallery {
   }
 
   createPhotoCircle() {
-    // 清除现有照片
+    // 清除现有照片和遮罩
     this.photoMeshes.forEach(mesh => this.scene.remove(mesh));
     this.photoMeshes = [];
     this.meshToPhoto.clear();
+    if (this.circleMask) {
+      this.scene.remove(this.circleMask);
+      this.circleMask = null;
+    }
 
     if (this.photos.length === 0) {
       this.createPlaceholder();
@@ -259,35 +264,55 @@ class PhotoGallery {
     }
 
     const count = this.photos.length;
-    const spacing = this.photoSize + 0.3;
+    const size = this.photoSize; // 无间隔
     let photoIndex = 0;
+    let maxRadius = 0;
 
     // 从圆心开始，向外扩展填满圆盘
     // 第一张放在圆心
     if (photoIndex < count) {
-      this.createPhotoMesh(this.photos[photoIndex], 0, 0, 0);
+      this.createPhotoMesh(this.photos[photoIndex], 0, 0);
       photoIndex++;
     }
 
-    // 从内到外一圈圈填充
+    // 从内到外一圈圈填充，无间隔
     let ring = 1;
     while (photoIndex < count) {
-      const ringRadius = ring * spacing;
+      const ringRadius = ring * size;
       // 根据圆周长计算这一圈能放多少张
       const circumference = 2 * Math.PI * ringRadius;
-      const photosInThisRing = Math.max(6, Math.floor(circumference / spacing));
+      const photosInThisRing = Math.max(6, Math.floor(circumference / size));
 
       for (let i = 0; i < photosInThisRing && photoIndex < count; i++) {
         const angle = (i / photosInThisRing) * Math.PI * 2;
-        this.createPhotoMesh(this.photos[photoIndex], ringRadius, angle, 0);
+        this.createPhotoMesh(this.photos[photoIndex], ringRadius, angle);
         photoIndex++;
       }
+      maxRadius = ringRadius;
       ring++;
     }
+
+    // 记录圆盘半径并添加圆形遮罩
+    this.diskRadius = maxRadius + size / 2;
+    this.addCircleMask(this.diskRadius);
   }
 
-  createPhotoMesh(photo, radius, angle, ringIndex) {
-    // 创建照片平面
+  addCircleMask(radius) {
+    // 创建一个大的环形遮罩，内圈是圆盘半径，外圈很大，颜色与背景相同
+    const innerRadius = radius;
+    const outerRadius = radius + 100; // 足够大以覆盖视野外的区域
+    const geometry = new THREE.RingGeometry(innerRadius, outerRadius, 128);
+    const material = new THREE.MeshBasicMaterial({
+      color: 0x0a0a0a, // 与背景色相同
+      side: THREE.DoubleSide
+    });
+    this.circleMask = new THREE.Mesh(geometry, material);
+    this.circleMask.position.z = 0.01; // 略微在照片前面
+    this.scene.add(this.circleMask);
+  }
+
+  createPhotoMesh(photo, radius, angle) {
+    // 创建照片平面 - 固定尺寸，无间隔
     const geometry = new THREE.PlaneGeometry(this.photoSize, this.photoSize);
 
     // 创建加载中的材质
@@ -303,10 +328,8 @@ class PhotoGallery {
     // 计算位置 (XY 平面上的圆盘)
     const x = Math.cos(angle) * radius;
     const y = Math.sin(angle) * radius;
-    const z = 0;
 
-    mesh.position.set(x, y, z);
-    // 照片平铺在 XY 平面，面向 Z 轴（相机方向）
+    mesh.position.set(x, y, 0);
 
     this.scene.add(mesh);
     this.photoMeshes.push(mesh);
@@ -319,18 +342,7 @@ class PhotoGallery {
         texture.minFilter = THREE.LinearFilter;
         texture.magFilter = THREE.LinearFilter;
 
-        // 计算纹理的宽高比
-        const imgAspect = texture.image.width / texture.image.height;
-
-        // 更新几何体以保持图片比例
-        const newGeometry = imgAspect > 1
-          ? new THREE.PlaneGeometry(this.photoSize, this.photoSize / imgAspect)
-          : new THREE.PlaneGeometry(this.photoSize * imgAspect, this.photoSize);
-
-        mesh.geometry.dispose();
-        mesh.geometry = newGeometry;
-
-        // 更新材质
+        // 更新材质 - 保持固定尺寸，图片会被裁剪填充
         mesh.material.map = texture;
         mesh.material.color.set(0xffffff);
         mesh.material.needsUpdate = true;
@@ -361,10 +373,17 @@ class PhotoGallery {
   }
 
   createPlaceholder() {
+    // 清除遮罩
+    if (this.circleMask) {
+      this.scene.remove(this.circleMask);
+      this.circleMask = null;
+    }
+
     // 创建200个无间隔的空白placeholder排列成圆盘
     const count = 200;
     const size = this.photoSize;
     let placeholderIndex = 0;
+    let maxRadius = 0;
 
     // 第一个放在圆心
     if (placeholderIndex < count) {
@@ -386,8 +405,13 @@ class PhotoGallery {
         this.createPlaceholderMesh(x, y);
         placeholderIndex++;
       }
+      maxRadius = ringRadius;
       ring++;
     }
+
+    // 添加圆形遮罩
+    this.diskRadius = maxRadius + size / 2;
+    this.addCircleMask(this.diskRadius);
   }
 
   createPlaceholderMesh(x, y) {
