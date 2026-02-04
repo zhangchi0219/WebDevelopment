@@ -52,13 +52,7 @@ class PhotoGallery {
       opacity: 0.6
     });
     const stars = new THREE.Points(starGeometry, starMaterial);
-    this.scene.add(stars);
-  }
-
-  setupCamera() {
-    const aspect = window.innerWidth / window.innerHeight;
-    this.camera = new THREE.PerspectiveCamera(60, aspect, 0.1, 1000);
-    this.camera.position.set(0, 0, 30);
+    
   }
 
   setupRenderer() {

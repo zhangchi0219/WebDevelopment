@@ -1,7 +1,7 @@
 const express = require('express');
 const multer = require('multer');
 const path = require('path');
-const { v4: uuidv4 } = require('uuid');
+const crypto = require('crypto');
 const cors = require('cors');
 const Database = require('better-sqlite3');
 
@@ -35,7 +35,7 @@ const storage = multer.diskStorage({
   },
   filename: (req, file, cb) => {
     const ext = path.extname(file.originalname);
-    const filename = `${uuidv4()}${ext}`;
+    const filename = `${crypto.randomUUID()}${ext}`;
     cb(null, filename);
   }
 });
@@ -66,7 +66,7 @@ app.post('/api/photos', upload.single('photo'), (req, res) => {
     }
 
     const photo = {
-      id: uuidv4(),
+      id: crypto.randomUUID(),
       filename: req.file.filename,
       original_name: req.file.originalname,
       mimetype: req.file.mimetype,
@@ -106,7 +106,7 @@ app.post('/api/photos/batch', upload.array('photos', 20), (req, res) => {
 
     const photos = req.files.map(file => {
       const photo = {
-        id: uuidv4(),
+        id: crypto.randomUUID(),
         filename: file.filename,
         original_name: file.originalname,
         mimetype: file.mimetype,
