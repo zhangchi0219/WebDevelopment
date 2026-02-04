@@ -150,6 +150,35 @@ class PhotoGallery {
         this.controls.autoRotate = true;
       }, 3000);
     });
+
+    // 清除照片按钮
+    const clearBtn = document.getElementById('clear-photos');
+    clearBtn.addEventListener('click', () => this.clearAllPhotos());
+  }
+
+  async clearAllPhotos() {
+    if (!confirm('确定要清除所有照片吗？此操作不可恢复。')) {
+      return;
+    }
+
+    try {
+      const response = await fetch('/api/photos', {
+        method: 'DELETE'
+      });
+      const data = await response.json();
+
+      if (data.success) {
+        this.photos = [];
+        this.updatePhotoCount(0);
+        this.createPhotoCircle();
+        this.showToast('所有照片已清除', 'success');
+      } else {
+        this.showToast('清除失败', 'error');
+      }
+    } catch (error) {
+      console.error('清除照片错误:', error);
+      this.showToast('清除失败', 'error');
+    }
   }
 
   onWindowResize() {
@@ -288,35 +317,47 @@ class PhotoGallery {
   }
 
   createPlaceholder() {
-    // 创建占位提示
-    const geometry = new THREE.RingGeometry(this.radius - 1, this.radius + 1, 64);
-    const material = new THREE.MeshBasicMaterial({
+    // 创建200个无间隔的空白placeholder排列成圆盘
+    const count = 200;
+    const size = this.photoSize;
+    let placeholderIndex = 0;
+
+    // 第一个放在圆心
+    if (placeholderIndex < count) {
+      this.createPlaceholderMesh(0, 0);
+      placeholderIndex++;
+    }
+
+    // 从内到外一圈圈填充，无间隔
+    let ring = 1;
+    while (placeholderIndex < count) {
+      const ringRadius = ring * size;
+      const circumference = 2 * Math.PI * ringRadius;
+      const placeholdersInThisRing = Math.max(6, Math.floor(circumference / size));
+
+      for (let i = 0; i < placeholdersInThisRing && placeholderIndex < count; i++) {
+        const angle = (i / placeholdersInThisRing) * Math.PI * 2;
+        const x = Math.cos(angle) * ringRadius;
+        const y = Math.sin(angle) * ringRadius;
+        this.createPlaceholderMesh(x, y);
+        placeholderIndex++;
+      }
+      ring++;
+    }
+  }
+
+  createPlaceholderMesh(x, y) {
+    const geometry = new THREE.PlaneGeometry(this.photoSize, this.photoSize);
+    const material = new THREE.MeshStandardMaterial({
       color: 0x333333,
       side: THREE.DoubleSide,
       transparent: true,
-      opacity: 0.3
+      opacity: 0.8
     });
-    const ring = new THREE.Mesh(geometry, material);
-    this.scene.add(ring);
-    this.photoMeshes.push(ring);
-
-    // 添加文字提示 (使用精灵)
-    const canvas = document.createElement('canvas');
-    canvas.width = 512;
-    canvas.height = 128;
-    const ctx = canvas.getContext('2d');
-    ctx.fillStyle = 'rgba(255, 255, 255, 0.5)';
-    ctx.font = '32px Arial';
-    ctx.textAlign = 'center';
-    ctx.fillText('上传照片开始创建画廊', 256, 70);
-
-    const texture = new THREE.CanvasTexture(canvas);
-    const spriteMaterial = new THREE.SpriteMaterial({ map: texture });
-    const sprite = new THREE.Sprite(spriteMaterial);
-    sprite.scale.set(15, 3.75, 1);
-    sprite.position.set(0, 0, 1);
-    this.scene.add(sprite);
-    this.photoMeshes.push(sprite);
+    const mesh = new THREE.Mesh(geometry, material);
+    mesh.position.set(x, y, 0);
+    this.scene.add(mesh);
+    this.photoMeshes.push(mesh);
   }
 
   async uploadFiles(files) {
