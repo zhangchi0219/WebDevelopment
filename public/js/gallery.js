@@ -3,6 +3,27 @@
  * 使用 Three.js 将照片排列成圆形展示
  */
 
+// 完美圆形照片数量表 (网格大小 -> 照片数)
+const PERFECT_CIRCLE_COUNTS = [
+  { grid: 3, count: 5 },
+  { grid: 5, count: 13 },
+  { grid: 7, count: 29 },
+  { grid: 9, count: 49 },
+  { grid: 11, count: 81 },
+  { grid: 13, count: 113 },
+  { grid: 15, count: 149 },
+  { grid: 17, count: 197 },  // 默认推荐
+  { grid: 19, count: 253 },
+  { grid: 21, count: 317 },
+  { grid: 23, count: 377 },
+  { grid: 25, count: 441 },
+  { grid: 27, count: 529 },
+  { grid: 29, count: 613 },
+  { grid: 31, count: 709 }
+];
+
+const DEFAULT_PHOTO_COUNT = 197; // 17x17 网格，完美圆形
+
 class PhotoGallery {
   constructor() {
     this.scene = null;
@@ -18,8 +39,38 @@ class PhotoGallery {
     this.raycaster = new THREE.Raycaster();
     this.mouse = new THREE.Vector2();
     this.meshToPhoto = new Map(); // mesh 到 photo 的映射
+    this.maxPhotos = DEFAULT_PHOTO_COUNT; // 默认最大照片数
 
     this.init();
+  }
+
+  // 根据照片数量找到最合适的完美圆形网格
+  findPerfectCircleGrid(photoCount) {
+    for (let i = PERFECT_CIRCLE_COUNTS.length - 1; i >= 0; i--) {
+      if (PERFECT_CIRCLE_COUNTS[i].count <= photoCount) {
+        return PERFECT_CIRCLE_COUNTS[i];
+      }
+    }
+    return PERFECT_CIRCLE_COUNTS[0];
+  }
+
+  // 计算指定网格大小的完美圆形位置
+  getCirclePositions(gridSize) {
+    const positions = [];
+    const halfGrid = (gridSize - 1) / 2;
+    const radius = gridSize / 2;
+
+    for (let row = 0; row < gridSize; row++) {
+      for (let col = 0; col < gridSize; col++) {
+        const x = col - halfGrid;
+        const y = halfGrid - row;
+        const dist = Math.sqrt(x * x + y * y);
+        if (dist <= radius - 0.5) {
+          positions.push({ x: x * this.photoSize, y: y * this.photoSize });
+        }
+      }
+    }
+    return positions;
   }
 
   init() {
@@ -232,7 +283,7 @@ class PhotoGallery {
 
   async loadPhotos() {
     try {
-      const response = await fetch('/api/photos?limit=200');
+      const response = await fetch('/api/photos?limit=1000');
       const data = await response.json();
 
       if (data.success) {
@@ -263,32 +314,19 @@ class PhotoGallery {
       return;
     }
 
-    const count = this.photos.length;
-    const size = this.photoSize;
+    // 找到能容纳当前照片数量的最小完美圆形
+    const perfectCircle = this.findPerfectCircleGrid(this.photos.length);
+    const positions = this.getCirclePositions(perfectCircle.grid);
 
-    // 计算网格大小，使其能容纳所有照片并形成圆形
-    const gridSize = Math.ceil(Math.sqrt(count * 4 / Math.PI)) + 2; // 略大一些确保填满圆
-    const halfGrid = (gridSize - 1) / 2;
-    const radius = (gridSize * size) / 2;
+    // 只显示能填满完美圆形的照片数量
+    const displayCount = Math.min(this.photos.length, perfectCircle.count);
 
-    let photoIndex = 0;
-
-    // 按行列排列，只放置在圆形范围内的位置
-    for (let row = 0; row < gridSize && photoIndex < count; row++) {
-      for (let col = 0; col < gridSize && photoIndex < count; col++) {
-        const x = (col - halfGrid) * size;
-        const y = (halfGrid - row) * size;
-
-        // 检查是否在圆形范围内
-        const distFromCenter = Math.sqrt(x * x + y * y);
-        if (distFromCenter <= radius - size / 2) {
-          this.createPhotoMesh(this.photos[photoIndex], x, y);
-          photoIndex++;
-        }
-      }
+    for (let i = 0; i < displayCount; i++) {
+      this.createPhotoMesh(this.photos[i], positions[i].x, positions[i].y);
     }
 
     // 添加圆形遮罩
+    const radius = (perfectCircle.grid * this.photoSize) / 2;
     this.diskRadius = radius;
     this.addCircleMask(this.diskRadius);
   }
@@ -383,32 +421,15 @@ class PhotoGallery {
       this.circleMask = null;
     }
 
-    // 创建200个无间隔的空白placeholder，按网格排列成圆形
-    const count = 200;
-    const size = this.photoSize;
+    // 使用默认完美圆形 (17x17 = 197张)
+    const positions = this.getCirclePositions(17);
 
-    // 计算网格大小
-    const gridSize = Math.ceil(Math.sqrt(count * 4 / Math.PI)) + 2;
-    const halfGrid = (gridSize - 1) / 2;
-    const radius = (gridSize * size) / 2;
-
-    let placeholderIndex = 0;
-
-    // 按行列排列，只放置在圆形范围内
-    for (let row = 0; row < gridSize && placeholderIndex < count; row++) {
-      for (let col = 0; col < gridSize && placeholderIndex < count; col++) {
-        const x = (col - halfGrid) * size;
-        const y = (halfGrid - row) * size;
-
-        const distFromCenter = Math.sqrt(x * x + y * y);
-        if (distFromCenter <= radius - size / 2) {
-          this.createPlaceholderMesh(x, y);
-          placeholderIndex++;
-        }
-      }
+    for (const pos of positions) {
+      this.createPlaceholderMesh(pos.x, pos.y);
     }
 
     // 添加圆形遮罩
+    const radius = (17 * this.photoSize) / 2;
     this.diskRadius = radius;
     this.addCircleMask(this.diskRadius);
   }
@@ -472,11 +493,6 @@ class PhotoGallery {
       } catch (error) {
         console.error('上传错误:', error);
       }
-    }
-
-    // 限制照片数量为200
-    if (this.photos.length > 200) {
-      this.photos = this.photos.slice(0, 200);
     }
 
     progressEl.classList.add('hidden');
