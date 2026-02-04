@@ -301,34 +301,38 @@ class PhotoGallery {
     this.photoMeshes = [];
     this.meshToPhoto.clear();
 
-    const photoCount = this.photos.length;
-
-    if (photoCount === 0) {
-      this.createPlaceholder();
-      return;
-    }
-
-    // 计算合适的网格大小
-    this.gridSize = this.calculateGridSize(photoCount);
-
-    // 圆形半径（略小于网格一半，确保完美圆形）
+    // 始终使用默认网格大小
+    this.gridSize = DEFAULT_GRID_SIZE;
     this.clipRadius = (this.gridSize * this.photoSize) / 2 - 0.01;
 
     const halfGrid = (this.gridSize - 1) / 2;
+    const photoCount = this.photos.length;
     let photoIndex = 0;
 
-    // 按网格排列所有照片
-    for (let row = 0; row < this.gridSize && photoIndex < photoCount; row++) {
-      for (let col = 0; col < this.gridSize && photoIndex < photoCount; col++) {
+    // 收集所有在圆形范围内的位置
+    const positions = [];
+    for (let row = 0; row < this.gridSize; row++) {
+      for (let col = 0; col < this.gridSize; col++) {
         const x = (col - halfGrid) * this.photoSize;
         const y = (halfGrid - row) * this.photoSize;
 
-        // 只在圆形范围内创建照片（包括边缘会被裁剪的）
         const dist = Math.sqrt(x * x + y * y);
         if (dist < this.clipRadius + this.photoSize) {
-          this.createPhotoMesh(this.photos[photoIndex], x, y);
-          photoIndex++;
+          positions.push({ x, y });
         }
+      }
+    }
+
+    // 为每个位置创建照片或占位符
+    for (let i = 0; i < positions.length; i++) {
+      const pos = positions[i];
+      if (photoIndex < photoCount) {
+        // 有照片，创建照片
+        this.createPhotoMesh(this.photos[photoIndex], pos.x, pos.y);
+        photoIndex++;
+      } else {
+        // 没有照片，创建占位符
+        this.createPlaceholderMesh(pos.x, pos.y);
       }
     }
   }
@@ -406,23 +410,8 @@ class PhotoGallery {
   }
 
   createPlaceholder() {
-    // 默认使用 15x15 网格
-    this.gridSize = DEFAULT_GRID_SIZE;
-    this.clipRadius = (this.gridSize * this.photoSize) / 2 - 0.01;
-
-    const halfGrid = (this.gridSize - 1) / 2;
-
-    for (let row = 0; row < this.gridSize; row++) {
-      for (let col = 0; col < this.gridSize; col++) {
-        const x = (col - halfGrid) * this.photoSize;
-        const y = (halfGrid - row) * this.photoSize;
-
-        const dist = Math.sqrt(x * x + y * y);
-        if (dist < this.clipRadius + this.photoSize) {
-          this.createPlaceholderMesh(x, y);
-        }
-      }
-    }
+    // createPhotoCircle 会自动处理没有照片时显示全部占位符的情况
+    this.createPhotoCircle();
   }
 
   createPlaceholderMesh(x, y) {
