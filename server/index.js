@@ -130,10 +130,10 @@ app.post('/api/photos/batch', upload.array('photos', 20), (req, res) => {
   }
 });
 
-// 获取照片列表 API
+// 获取照片列表 API (最近 200 张)
 app.get('/api/photos', (req, res) => {
   try {
-    const limit = parseInt(req.query.limit) || 1000;
+    const limit = Math.min(parseInt(req.query.limit) || 200, 200);
     const stmt = db.prepare(`
       SELECT id, filename, original_name, mimetype, size, created_at
       FROM photos

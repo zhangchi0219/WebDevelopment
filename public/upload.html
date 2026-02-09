@@ -1,0 +1,528 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>上传照片</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+      background: linear-gradient(135deg, #1a1a2e 0%, #16213e 50%, #0f3460 100%);
+      color: #fff;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding: 20px;
+    }
+
+    .container {
+      width: 100%;
+      max-width: 400px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+    }
+
+    .header {
+      text-align: center;
+      margin-bottom: 30px;
+      margin-top: 20px;
+    }
+
+    .header h1 {
+      font-size: 24px;
+      font-weight: 600;
+      margin-bottom: 8px;
+    }
+
+    .header p {
+      font-size: 14px;
+      color: rgba(255, 255, 255, 0.6);
+    }
+
+    .upload-area {
+      width: 100%;
+      background: rgba(255, 255, 255, 0.05);
+      border: 2px dashed rgba(255, 255, 255, 0.3);
+      border-radius: 20px;
+      padding: 40px 20px;
+      text-align: center;
+      cursor: pointer;
+      transition: all 0.3s ease;
+      margin-bottom: 20px;
+    }
+
+    .upload-area:active,
+    .upload-area.dragover {
+      border-color: #4a9eff;
+      background: rgba(74, 158, 255, 0.1);
+      transform: scale(0.98);
+    }
+
+    .upload-icon {
+      width: 80px;
+      height: 80px;
+      margin: 0 auto 20px;
+      background: rgba(74, 158, 255, 0.2);
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .upload-icon svg {
+      width: 40px;
+      height: 40px;
+      fill: #4a9eff;
+    }
+
+    .upload-area h2 {
+      font-size: 18px;
+      font-weight: 500;
+      margin-bottom: 8px;
+    }
+
+    .upload-area p {
+      font-size: 14px;
+      color: rgba(255, 255, 255, 0.5);
+    }
+
+    input[type="file"] {
+      display: none;
+    }
+
+    .camera-btn {
+      width: 100%;
+      padding: 16px;
+      background: linear-gradient(135deg, #4a9eff 0%, #6c5ce7 100%);
+      border: none;
+      border-radius: 12px;
+      color: #fff;
+      font-size: 16px;
+      font-weight: 500;
+      cursor: pointer;
+      transition: all 0.3s ease;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      margin-bottom: 12px;
+    }
+
+    .camera-btn:active {
+      transform: scale(0.98);
+      opacity: 0.9;
+    }
+
+    .camera-btn svg {
+      width: 24px;
+      height: 24px;
+      fill: currentColor;
+    }
+
+    .gallery-btn {
+      width: 100%;
+      padding: 16px;
+      background: rgba(255, 255, 255, 0.1);
+      border: 1px solid rgba(255, 255, 255, 0.2);
+      border-radius: 12px;
+      color: #fff;
+      font-size: 16px;
+      font-weight: 500;
+      cursor: pointer;
+      transition: all 0.3s ease;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+    }
+
+    .gallery-btn:active {
+      transform: scale(0.98);
+      background: rgba(255, 255, 255, 0.15);
+    }
+
+    .gallery-btn svg {
+      width: 24px;
+      height: 24px;
+      fill: currentColor;
+    }
+
+    /* 上传进度 */
+    .progress-container {
+      width: 100%;
+      margin-top: 20px;
+      display: none;
+    }
+
+    .progress-container.visible {
+      display: block;
+    }
+
+    .progress-bar {
+      height: 6px;
+      background: rgba(255, 255, 255, 0.1);
+      border-radius: 3px;
+      overflow: hidden;
+      margin-bottom: 10px;
+    }
+
+    .progress-fill {
+      height: 100%;
+      width: 0%;
+      background: linear-gradient(90deg, #4a9eff, #6c5ce7);
+      border-radius: 3px;
+      transition: width 0.3s ease;
+    }
+
+    .progress-text {
+      font-size: 14px;
+      color: rgba(255, 255, 255, 0.7);
+      text-align: center;
+    }
+
+    /* 预览区域 */
+    .preview-container {
+      width: 100%;
+      margin-top: 20px;
+      display: none;
+    }
+
+    .preview-container.visible {
+      display: block;
+    }
+
+    .preview-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 12px;
+    }
+
+    .preview-header h3 {
+      font-size: 16px;
+      font-weight: 500;
+    }
+
+    .preview-header span {
+      font-size: 14px;
+      color: rgba(255, 255, 255, 0.5);
+    }
+
+    .preview-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 8px;
+    }
+
+    .preview-item {
+      position: relative;
+      padding-bottom: 100%;
+      border-radius: 8px;
+      overflow: hidden;
+      background: rgba(255, 255, 255, 0.05);
+    }
+
+    .preview-item img {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+    }
+
+    .preview-item .status {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background: rgba(0, 0, 0, 0.5);
+    }
+
+    .preview-item .status.success {
+      background: rgba(39, 174, 96, 0.7);
+    }
+
+    .preview-item .status.error {
+      background: rgba(231, 76, 60, 0.7);
+    }
+
+    .preview-item .status svg {
+      width: 32px;
+      height: 32px;
+      fill: #fff;
+    }
+
+    .spinner {
+      width: 24px;
+      height: 24px;
+      border: 2px solid rgba(255, 255, 255, 0.3);
+      border-top-color: #fff;
+      border-radius: 50%;
+      animation: spin 0.8s linear infinite;
+    }
+
+    @keyframes spin {
+      to { transform: rotate(360deg); }
+    }
+
+    /* Toast */
+    .toast {
+      position: fixed;
+      bottom: 30px;
+      left: 50%;
+      transform: translateX(-50%) translateY(20px);
+      background: rgba(20, 20, 20, 0.95);
+      color: #fff;
+      padding: 12px 24px;
+      border-radius: 8px;
+      font-size: 14px;
+      z-index: 1000;
+      opacity: 0;
+      transition: all 0.3s ease;
+      pointer-events: none;
+    }
+
+    .toast.visible {
+      opacity: 1;
+      transform: translateX(-50%) translateY(0);
+    }
+
+    .toast.success {
+      background: rgba(39, 174, 96, 0.95);
+    }
+
+    .toast.error {
+      background: rgba(231, 76, 60, 0.95);
+    }
+
+    /* 返回链接 */
+    .back-link {
+      margin-top: 30px;
+      font-size: 14px;
+      color: rgba(255, 255, 255, 0.5);
+      text-decoration: none;
+      transition: color 0.3s ease;
+    }
+
+    .back-link:hover {
+      color: #4a9eff;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="header">
+      <h1>上传照片</h1>
+      <p>选择或拍摄照片上传到画廊</p>
+    </div>
+
+    <div class="upload-area" id="upload-area">
+      <div class="upload-icon">
+        <svg viewBox="0 0 24 24"><path d="M19.35 10.04C18.67 6.59 15.64 4 12 4 9.11 4 6.6 5.64 5.35 8.04 2.34 8.36 0 10.91 0 14c0 3.31 2.69 6 6 6h13c2.76 0 5-2.24 5-5 0-2.64-2.05-4.78-4.65-4.96zM14 13v4h-4v-4H7l5-5 5 5h-3z"/></svg>
+      </div>
+      <h2>点击选择照片</h2>
+      <p>支持 JPG, PNG, GIF, WebP</p>
+    </div>
+
+    <input type="file" id="file-input" accept="image/*" multiple>
+    <input type="file" id="camera-input" accept="image/*" capture="environment">
+
+    <button class="camera-btn" id="camera-btn">
+      <svg viewBox="0 0 24 24"><path d="M12 15.2c1.77 0 3.2-1.43 3.2-3.2s-1.43-3.2-3.2-3.2S8.8 10.23 8.8 12s1.43 3.2 3.2 3.2zm9-10.2h-3.17l-1.5-2H7.67l-1.5 2H3c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h18c1.1 0 2-.9 2-2V7c0-1.1-.9-2-2-2zm0 14H3V7h4.05l1.5-2h6.9l1.5 2H21v12z"/></svg>
+      拍照上传
+    </button>
+
+    <button class="gallery-btn" id="gallery-btn">
+      <svg viewBox="0 0 24 24"><path d="M22 16V4c0-1.1-.9-2-2-2H8c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2zm-11-4l2.03 2.71L16 11l4 5H8l3-4zM2 6v14c0 1.1.9 2 2 2h14v-2H4V6H2z"/></svg>
+      从相册选择
+    </button>
+
+    <div class="progress-container" id="progress-container">
+      <div class="progress-bar">
+        <div class="progress-fill" id="progress-fill"></div>
+      </div>
+      <div class="progress-text" id="progress-text">上传中...</div>
+    </div>
+
+    <div class="preview-container" id="preview-container">
+      <div class="preview-header">
+        <h3>已选择</h3>
+        <span id="preview-count">0 张照片</span>
+      </div>
+      <div class="preview-grid" id="preview-grid"></div>
+    </div>
+
+    <a href="/" class="back-link">← 返回画廊</a>
+  </div>
+
+  <div class="toast" id="toast"></div>
+
+  <script>
+    const uploadArea = document.getElementById('upload-area');
+    const fileInput = document.getElementById('file-input');
+    const cameraInput = document.getElementById('camera-input');
+    const cameraBtn = document.getElementById('camera-btn');
+    const galleryBtn = document.getElementById('gallery-btn');
+    const progressContainer = document.getElementById('progress-container');
+    const progressFill = document.getElementById('progress-fill');
+    const progressText = document.getElementById('progress-text');
+    const previewContainer = document.getElementById('preview-container');
+    const previewGrid = document.getElementById('preview-grid');
+    const previewCount = document.getElementById('preview-count');
+    const toast = document.getElementById('toast');
+
+    // 点击上传区域
+    uploadArea.addEventListener('click', () => fileInput.click());
+
+    // 拍照按钮
+    cameraBtn.addEventListener('click', () => cameraInput.click());
+
+    // 相册按钮
+    galleryBtn.addEventListener('click', () => fileInput.click());
+
+    // 文件选择
+    fileInput.addEventListener('change', (e) => handleFiles(e.target.files));
+    cameraInput.addEventListener('change', (e) => handleFiles(e.target.files));
+
+    // 拖拽上传
+    uploadArea.addEventListener('dragover', (e) => {
+      e.preventDefault();
+      uploadArea.classList.add('dragover');
+    });
+
+    uploadArea.addEventListener('dragleave', () => {
+      uploadArea.classList.remove('dragover');
+    });
+
+    uploadArea.addEventListener('drop', (e) => {
+      e.preventDefault();
+      uploadArea.classList.remove('dragover');
+      handleFiles(e.dataTransfer.files);
+    });
+
+    async function handleFiles(files) {
+      const validFiles = Array.from(files).filter(file => file.type.startsWith('image/'));
+
+      if (validFiles.length === 0) {
+        showToast('请选择有效的图片文件', 'error');
+        return;
+      }
+
+      // 显示预览
+      showPreviews(validFiles);
+
+      // 显示进度
+      progressContainer.classList.add('visible');
+      progressFill.style.width = '0%';
+
+      let uploaded = 0;
+      const total = validFiles.length;
+
+      for (let i = 0; i < validFiles.length; i++) {
+        const file = validFiles[i];
+        const previewItem = previewGrid.children[i];
+
+        try {
+          const formData = new FormData();
+          formData.append('photo', file);
+
+          const response = await fetch('/api/photos', {
+            method: 'POST',
+            body: formData
+          });
+
+          const data = await response.json();
+
+          if (data.success) {
+            uploaded++;
+            updatePreviewStatus(previewItem, 'success');
+          } else {
+            updatePreviewStatus(previewItem, 'error');
+          }
+        } catch (error) {
+          console.error('上传错误:', error);
+          updatePreviewStatus(previewItem, 'error');
+        }
+
+        const progress = ((i + 1) / total) * 100;
+        progressFill.style.width = `${progress}%`;
+        progressText.textContent = `上传中... ${i + 1}/${total}`;
+      }
+
+      progressText.textContent = `完成 ${uploaded}/${total}`;
+
+      setTimeout(() => {
+        progressContainer.classList.remove('visible');
+        progressFill.style.width = '0%';
+      }, 2000);
+
+      if (uploaded > 0) {
+        showToast(`成功上传 ${uploaded} 张照片`, 'success');
+      } else {
+        showToast('上传失败', 'error');
+      }
+
+      // 清空input
+      fileInput.value = '';
+      cameraInput.value = '';
+    }
+
+    function showPreviews(files) {
+      previewContainer.classList.add('visible');
+      previewCount.textContent = `${files.length} 张照片`;
+      previewGrid.innerHTML = '';
+
+      files.forEach(file => {
+        const item = document.createElement('div');
+        item.className = 'preview-item';
+
+        const img = document.createElement('img');
+        img.src = URL.createObjectURL(file);
+
+        const status = document.createElement('div');
+        status.className = 'status';
+        status.innerHTML = '<div class="spinner"></div>';
+
+        item.appendChild(img);
+        item.appendChild(status);
+        previewGrid.appendChild(item);
+      });
+    }
+
+    function updatePreviewStatus(item, type) {
+      const status = item.querySelector('.status');
+      status.className = `status ${type}`;
+
+      if (type === 'success') {
+        status.innerHTML = '<svg viewBox="0 0 24 24"><path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/></svg>';
+      } else {
+        status.innerHTML = '<svg viewBox="0 0 24 24"><path d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>';
+      }
+    }
+
+    function showToast(message, type = 'info') {
+      toast.textContent = message;
+      toast.className = `toast ${type}`;
+
+      setTimeout(() => toast.classList.add('visible'), 10);
+
+      setTimeout(() => {
+        toast.classList.remove('visible');
+      }, 3000);
+    }
+  </script>
+</body>
+</html>

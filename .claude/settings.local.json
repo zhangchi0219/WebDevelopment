@@ -1,0 +1,20 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(git add:*)",
+      "Bash(git commit -m \"$\\(cat <<''EOF''\nfix: 恢复 setupCamera 方法和星空背景\n\n修复上一次提交中意外删除的代码导致页面无法加载的问题\n\nCo-Authored-By: Claude Opus 4.5 <noreply@anthropic.com>\nEOF\n\\)\")",
+      "Bash(git push)",
+      "Bash(git commit -m \"$\\(cat <<''EOF''\nfix: 将照片排列改为填满圆盘而非圆环\n\n照片从圆心开始向外扩展，填满整个圆形区域\n\nCo-Authored-By: Claude Opus 4.5 <noreply@anthropic.com>\nEOF\n\\)\")",
+      "Bash(node:*)",
+      "Bash(git commit -m \"$\\(cat <<''EOF''\nfix: 调整路由顺序，将 /api/photos/all 移到 :id 之前\n\nExpress 路由匹配是按顺序的，:id 会匹配任何字符串包括 all\n\nCo-Authored-By: Claude Opus 4.5 <noreply@anthropic.com>\nEOF\n\\)\")",
+      "Bash(git commit -m \"$\\(cat <<''EOF''\nfeat: 移除照片间隔并添加圆形遮罩\n\n- 照片之间无间隔，严丝合缝\n- 添加环形遮罩使整体呈现完美圆形\n- 照片保持固定尺寸填充\n\nCo-Authored-By: Claude Opus 4.5 <noreply@anthropic.com>\nEOF\n\\)\")",
+      "Bash(git commit -m \"$\\(cat <<''EOF''\nfeat: 改为行列网格布局，1:1缩略图裁剪显示\n\n- 照片按网格行列排列，无间隔\n- 缩略图1:1比例居中裁剪\n- 点击显示原图\n- 圆形遮罩保持整体圆形外观\n\nCo-Authored-By: Claude Opus 4.5 <noreply@anthropic.com>\nEOF\n\\)\")",
+      "Bash(git commit -m \"$\\(cat <<''EOF''\nfeat: 支持完美圆形照片数量，默认197张\n\n完美圆形照片数量表：\n- 5, 13, 29, 49, 81, 113, 149, 197, 253, 317, 377, 441...\n- 默认使用197张 \\(17x17网格\\)\n- 自动根据照片数量选择最合适的完美圆形\n- 移除200张限制\n\nCo-Authored-By: Claude Opus 4.5 <noreply@anthropic.com>\nEOF\n\\)\")",
+      "Bash(git commit -m \"$\\(cat <<''EOF''\nfeat: 使用 Shader 实现完美圆形裁剪\n\n- 自定义 ShaderMaterial 实现圆形边界裁剪\n- 边缘照片被圆形遮罩裁切成曲线\n- 动态计算网格大小适应照片数量\n- 默认 15x15 网格的占位符\n\nCo-Authored-By: Claude Opus 4.5 <noreply@anthropic.com>\nEOF\n\\)\")",
+      "Bash(git commit -m \"$\\(cat <<''EOF''\nfeat: 上传照片时保留未使用的 placeholder\n\n- 照片替换对应位置的占位符\n- 剩余位置保留占位符显示\n- 始终保持完整的圆形布局\n\nCo-Authored-By: Claude Opus 4.5 <noreply@anthropic.com>\nEOF\n\\)\")",
+      "Bash(git -C \"E:\\\\GitHub\\\\WebDevelopment\" log --oneline -5)",
+      "Bash(git push:*)",
+      "Bash(git commit -m \"$\\(cat <<''EOF''\nfeat: 添加管理面板、二维码上传和太阳光效\n\n- 新增管理员面板，支持查看/删除照片和数据库记录\n- 二维码扫码生成，手机端可直接上传照片\n- 新增移动端上传页面 \\(upload.html\\)，支持拍照和相册选择\n- Shader 增加太阳色调渐变和脉冲动画效果\n- 上传面板可收起/展开\n- API 照片列表限制为最多 200 条\n\nCo-Authored-By: Claude Opus 4.6 <noreply@anthropic.com>\nEOF\n\\)\")"
+    ]
+  }
+}
