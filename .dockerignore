@@ -1,0 +1,10 @@
+.git
+node_modules
+data
+public/uploads/*
+!public/uploads/.gitkeep
+*.log
+.env
+.DS_Store
+.claude
+CLAUDE.md
