@@ -1,0 +1,15 @@
+services:
+  gallery:
+    build: .
+    ports:
+      - "3000:3000"
+    volumes:
+      - gallery-data:/app/data
+      - gallery-uploads:/app/public/uploads
+    environment:
+      - PORT=3000
+    restart: unless-stopped
+
+volumes:
+  gallery-data:
+  gallery-uploads:
